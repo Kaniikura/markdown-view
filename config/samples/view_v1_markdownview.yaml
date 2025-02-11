@@ -6,4 +6,12 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: markdownview-sample
 spec:
-  # TODO(user): Add fields here
+  markdowns: 
+    SUMMARY.md: |
+      # Summary
+      This is a summary.
+
+      - [Page1](page1.md)
+    page1.md: |
+      # Page1
+      This is page1.
