@@ -31,7 +31,7 @@ import (
 	appsv1apply "k8s.io/client-go/applyconfigurations/apps/v1"
 	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1apply "k8s.io/client-go/applyconfigurations/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -222,7 +222,7 @@ func (r *MarkdownViewReconciler) reconcileDeployment(ctx context.Context, mdView
 
 	err = r.Patch(ctx, patch, client.Apply, &client.PatchOptions{
 		FieldManager: "markdown-view-controller",
-		Force:        pointer.Bool(true),
+		Force:        ptr.To(bool(true)),
 	})
 
 	if err != nil {
@@ -282,7 +282,7 @@ func (r *MarkdownViewReconciler) reconcileService(ctx context.Context, mdView vi
 
 	err = r.Patch(ctx, patch, client.Apply, &client.PatchOptions{
 		FieldManager: "markdown-view-controller",
-		Force:        pointer.Bool(true),
+		Force:        ptr.To(bool(true)),
 	})
 	if err != nil {
 		logger.Error(err, "unable to create or update Service")
