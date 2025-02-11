@@ -23,35 +23,53 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	viewv1 "github.com/Kaniikura/markdown-view/api/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ = Describe("MarkdownView Controller", func() {
 	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
+		const resourceName = "sample"
+		const testNamespace = "test"
 
 		ctx := context.Background()
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Namespace: testNamespace,
 		}
-		markdownview := &viewv1.MarkdownView{}
 
 		BeforeEach(func() {
+			By("creating the namespace for the test")
+			ns := &corev1.Namespace{}
+			ns.Name = testNamespace
+			err := k8sClient.Create(context.Background(), ns)
+			Expect(err).NotTo(HaveOccurred())
+
 			By("creating the custom resource for the Kind MarkdownView")
-			err := k8sClient.Get(ctx, typeNamespacedName, markdownview)
+			markdownview := &viewv1.MarkdownView{}
+			err = k8sClient.Get(ctx, typeNamespacedName, markdownview)
 			if err != nil && errors.IsNotFound(err) {
 				resource := &viewv1.MarkdownView{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
-						Namespace: "default",
+						Namespace: testNamespace,
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: viewv1.MarkdownViewSpec{
+						Markdowns: map[string]string{
+							"SUMMARY.md": `summary`,
+							"page1.md":   `page1`,
+						},
+						Replicas:    3,
+						ViewerImage: "peaceiris/mdbook:0.4.10",
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
@@ -65,7 +83,20 @@ var _ = Describe("MarkdownView Controller", func() {
 
 			By("Cleanup the specific resource instance MarkdownView")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+
+			err = k8sClient.DeleteAllOf(ctx, &corev1.ConfigMap{}, client.InNamespace(testNamespace))
+			Expect(err).NotTo(HaveOccurred())
+			err = k8sClient.DeleteAllOf(ctx, &appsv1.Deployment{}, client.InNamespace(testNamespace))
+			Expect(err).NotTo(HaveOccurred())
+			svcs := &corev1.ServiceList{}
+			err = k8sClient.List(ctx, svcs, client.InNamespace(testNamespace))
+			Expect(err).NotTo(HaveOccurred())
+			for _, svc := range svcs.Items {
+				err := k8sClient.Delete(ctx, &svc)
+				Expect(err).NotTo(HaveOccurred())
+			}
 		})
+
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
 			controllerReconciler := &MarkdownViewReconciler{
@@ -77,8 +108,33 @@ var _ = Describe("MarkdownView Controller", func() {
 				NamespacedName: typeNamespacedName,
 			})
 			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+
+			By("Making sure the configMap created successfully")
+			cm := corev1.ConfigMap{}
+			err = k8sClient.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "markdowns-sample"}, &cm)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cm.Data).Should(HaveKey("SUMMARY.md"))
+			Expect(cm.Data).Should(HaveKey("page1.md"))
+
+			By("Making sure the Deployment created successfully")
+			dep := appsv1.Deployment{}
+			err = k8sClient.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "viewer-sample"}, &dep)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(dep.Spec.Replicas).Should(Equal(ptr.To[int32](3)))
+			Expect(dep.Spec.Template.Spec.Containers[0].Image).Should(Equal("peaceiris/mdbook:0.4.10"))
+
+			By("Making sure the Service created successfully")
+			svc := corev1.Service{}
+			err = k8sClient.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "viewer-sample"}, &svc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(svc.Spec.Ports[0].Port).Should(Equal(int32(80)))
+			Expect(svc.Spec.Ports[0].TargetPort).Should(Equal(intstr.FromInt32(3000)))
+
+			By("Making sure the Status updated successfully")
+			updated := viewv1.MarkdownView{}
+			err = k8sClient.Get(ctx, typeNamespacedName, &updated)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(updated.Status.Conditions).ShouldNot(BeEmpty(), "status should be updated")
 		})
 	})
 })
