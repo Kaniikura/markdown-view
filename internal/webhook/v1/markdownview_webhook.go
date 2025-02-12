@@ -65,7 +65,9 @@ func (d *MarkdownViewCustomDefaulter) Default(ctx context.Context, obj runtime.O
 	}
 	markdownviewlog.Info("Defaulting for MarkdownView", "name", markdownview.GetName())
 
-	// TODO(user): fill in your defaulting logic.
+	if len(markdownview.Spec.ViewerImage) == 0 {
+		markdownview.Spec.ViewerImage = "peaceiris/mdbook:latest"
+	}
 
 	return nil
 }

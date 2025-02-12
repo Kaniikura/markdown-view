@@ -133,10 +133,7 @@ func (r *MarkdownViewReconciler) reconcileDeployment(ctx context.Context, mdView
 	logger := log.FromContext(ctx)
 
 	depName := "viewer-" + mdView.Name
-	viewerImage := "peaceiris/mdbook:latest"
-	if len(mdView.Spec.ViewerImage) != 0 {
-		viewerImage = mdView.Spec.ViewerImage
-	}
+	viewerImage := mdView.Spec.ViewerImage
 
 	dep := appsv1apply.Deployment(depName, mdView.Namespace).
 		WithLabels(map[string]string{
