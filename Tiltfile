@@ -16,24 +16,44 @@ def binary():
     return 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/manager cmd/main.go'
 
 # Generate manifests and go files
-local_resource('make manifests', manifests(), deps=["api", "internal", "hooks"], ignore=['*/*/zz_generated.deepcopy.go'])
-local_resource('make generate', generate(), deps=["api", "hooks"], ignore=['*/*/zz_generated.deepcopy.go'])
+local_resource(
+    'make manifests',
+    manifests(),
+    deps=["api", "internal", "hooks"],
+    ignore=['*/*/zz_generated.deepcopy.go']
+)
+
+local_resource(
+    'make generate',
+    generate(),
+    deps=["api", "hooks"],
+    ignore=['*/*/zz_generated.deepcopy.go']
+)
 
 # Deploy CRD
 local_resource(
-    'CRD', manifests() + 'kustomize build config/crd | kubectl apply -f -', deps=["api"],
-    ignore=['*/*/zz_generated.deepcopy.go'])
+    'CRD',
+    manifests() + 'kustomize build config/crd | kubectl apply -f -',
+    deps=["api"],
+    ignore=['*/*/zz_generated.deepcopy.go'],
+    resource_deps=['make manifests']  # 依存関係を追加
+)
 
 # Deploy manager
 watch_file('./config/')
 k8s_yaml(kustomize('./config/dev'))
 
 local_resource(
-    'Watch & Compile', generate() + binary(), deps=['internal', 'api', 'cmd/main.go'],
-    ignore=['*/*/zz_generated.deepcopy.go'])
+    'Watch & Compile',
+    generate() + binary(),
+    deps=['internal', 'api', 'cmd/main.go'],
+    ignore=['*/*/zz_generated.deepcopy.go'],
+    resource_deps=['make generate']
+)
 
 docker_build_with_restart(
-    'controller:latest', '.',
+    'controller:latest',
+    '.',
     dockerfile_contents=DOCKERFILE,
     entrypoint=['/manager', '--metrics-bind-address=:8443'],
     only=['./bin/manager'],
@@ -42,6 +62,12 @@ docker_build_with_restart(
     ]
 )
 
+k8s_resource(
+    workload='markdown-view-controller-manager'
+)
+
 local_resource(
-    'Sample', 'kubectl apply -f ./config/samples/view_v1_markdownview.yaml',
-    deps=["./config/samples/view_v1_markdownview.yaml"])
+    'Sample',
+    'kubectl apply -f ./config/samples/view_v1_markdownview.yaml',
+    deps=["./config/samples/view_v1_markdownview.yaml"]
+)
