@@ -36,7 +36,7 @@ import (
 
 var _ = Describe("MarkdownView Controller", func() {
 	Context("When reconciling a resource", func() {
-		const resourceName = "sample"
+		const resourceName = "test"
 		const testNamespace = "test"
 
 		ctx := context.Background()
