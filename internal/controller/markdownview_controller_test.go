@@ -111,21 +111,21 @@ var _ = Describe("MarkdownView Controller", func() {
 
 			By("Making sure the configMap created successfully")
 			cm := corev1.ConfigMap{}
-			err = k8sClient.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "markdowns-sample"}, &cm)
+			err = k8sClient.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "markdowns-test"}, &cm)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(cm.Data).Should(HaveKey("SUMMARY.md"))
 			Expect(cm.Data).Should(HaveKey("page1.md"))
 
 			By("Making sure the Deployment created successfully")
 			dep := appsv1.Deployment{}
-			err = k8sClient.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "viewer-sample"}, &dep)
+			err = k8sClient.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "viewer-test"}, &dep)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(dep.Spec.Replicas).Should(Equal(ptr.To[int32](3)))
 			Expect(dep.Spec.Template.Spec.Containers[0].Image).Should(Equal("peaceiris/mdbook:0.4.10"))
 
 			By("Making sure the Service created successfully")
 			svc := corev1.Service{}
-			err = k8sClient.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "viewer-sample"}, &svc)
+			err = k8sClient.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "viewer-test"}, &svc)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(svc.Spec.Ports[0].Port).Should(Equal(int32(80)))
 			Expect(svc.Spec.Ports[0].TargetPort).Should(Equal(intstr.FromInt32(3000)))
