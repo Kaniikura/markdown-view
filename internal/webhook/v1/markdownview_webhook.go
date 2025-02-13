@@ -27,6 +27,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	viewv1 "github.com/Kaniikura/markdown-view/api/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // nolint:unused
@@ -39,6 +42,12 @@ func SetupMarkdownViewWebhookWithManager(mgr ctrl.Manager) error {
 		WithValidator(&MarkdownViewCustomValidator{}).
 		WithDefaulter(&MarkdownViewCustomDefaulter{}).
 		Complete()
+}
+
+func logValidationError(markdownview *viewv1.MarkdownView, errs field.ErrorList) error {
+	err := apierrors.NewInvalid(schema.GroupKind{Group: "view.kaniikura.github.io", Kind: "MarkdownView"}, markdownview.Name, errs)
+	markdownviewlog.Error(err, "validation error", "name", markdownview.Name)
+	return err
 }
 
 // TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -96,9 +105,7 @@ func (v *MarkdownViewCustomValidator) ValidateCreate(ctx context.Context, obj ru
 	}
 	markdownviewlog.Info("Validation for MarkdownView upon creation", "name", markdownview.GetName())
 
-	// TODO(user): fill in your validation logic upon object creation.
-
-	return nil, nil
+	return v.validate(obj)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type MarkdownView.
@@ -109,7 +116,35 @@ func (v *MarkdownViewCustomValidator) ValidateUpdate(ctx context.Context, oldObj
 	}
 	markdownviewlog.Info("Validation for MarkdownView upon update", "name", markdownview.GetName())
 
-	// TODO(user): fill in your validation logic upon object update.
+	return v.validate(newObj)
+}
+
+func (v *MarkdownViewCustomValidator) validate(obj runtime.Object) (admission.Warnings, error) {
+	markdownview, ok := obj.(*viewv1.MarkdownView)
+	if !ok {
+		return nil, fmt.Errorf("expected a MarkdownView object but got %T", obj)
+	}
+
+	var errs field.ErrorList
+
+	if markdownview.Spec.Replicas < 1 || markdownview.Spec.Replicas > 5 {
+		errs = append(errs, field.Invalid(field.NewPath("spec", "replicas"), markdownview.Spec.Replicas, "replicas must be in the range of 1 to 5."))
+	}
+
+	hasSummary := false
+	for name := range markdownview.Spec.Markdowns {
+		if name == "SUMMARY.md" {
+			hasSummary = true
+			break
+		}
+	}
+	if !hasSummary {
+		errs = append(errs, field.Required(field.NewPath("spec", "markdowns"), "markdowns must have SUMMARY.md."))
+	}
+
+	if len(errs) > 0 {
+		return nil, logValidationError(markdownview, errs)
+	}
 
 	return nil, nil
 }
