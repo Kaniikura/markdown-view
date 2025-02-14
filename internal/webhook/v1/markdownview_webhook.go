@@ -50,8 +50,6 @@ func logValidationError(markdownview *viewv1.MarkdownView, errs field.ErrorList)
 	return err
 }
 
-// TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-
 // +kubebuilder:webhook:path=/mutate-view-kaniikura-github-io-v1-markdownview,mutating=true,failurePolicy=fail,sideEffects=None,groups=view.kaniikura.github.io,resources=markdownviews,verbs=create;update,versions=v1,name=mmarkdownview-v1.kb.io,admissionReviewVersions=v1
 
 // MarkdownViewCustomDefaulter struct is responsible for setting default values on the custom resource of the
@@ -68,7 +66,6 @@ var _ webhook.CustomDefaulter = &MarkdownViewCustomDefaulter{}
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind MarkdownView.
 func (d *MarkdownViewCustomDefaulter) Default(ctx context.Context, obj runtime.Object) error {
 	markdownview, ok := obj.(*viewv1.MarkdownView)
-
 	if !ok {
 		return fmt.Errorf("expected an MarkdownView object but got %T", obj)
 	}
@@ -81,10 +78,7 @@ func (d *MarkdownViewCustomDefaulter) Default(ctx context.Context, obj runtime.O
 	return nil
 }
 
-// TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-// NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
-// Modifying the path for an invalid path can cause API server errors; failing to locate the webhook.
-// +kubebuilder:webhook:path=/validate-view-kaniikura-github-io-v1-markdownview,mutating=false,failurePolicy=fail,sideEffects=None,groups=view.kaniikura.github.io,resources=markdownviews,verbs=create;update,versions=v1,name=vmarkdownview-v1.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-view-kaniikura-github-io-v1-markdownview,mutating=false,failurePolicy=fail,sideEffects=None,groups=view.kaniikura.github.io,resources=markdownviews,verbs=create;update;delete,versions=v1,name=vmarkdownview-v1.kb.io,admissionReviewVersions=v1
 
 // MarkdownViewCustomValidator struct is responsible for validating the MarkdownView resource
 // when it is created, updated, or deleted.
@@ -97,6 +91,24 @@ type MarkdownViewCustomValidator struct {
 
 var _ webhook.CustomValidator = &MarkdownViewCustomValidator{}
 
+func (v *MarkdownViewCustomValidator) validate(obj *viewv1.MarkdownView) (admission.Warnings, error) {
+	var errs field.ErrorList
+
+	if obj.Spec.Replicas < 1 || obj.Spec.Replicas > 5 {
+		errs = append(errs, field.Invalid(field.NewPath("spec", "replicas"), obj.Spec.Replicas, "replicas must be in the range of 1 to 5."))
+	}
+
+	if _, ok := obj.Spec.Markdowns["SUMMARY.md"]; !ok {
+		errs = append(errs, field.Required(field.NewPath("spec", "markdowns"), "markdowns must have SUMMARY.md."))
+	}
+
+	if len(errs) > 0 {
+		return nil, logValidationError(obj, errs)
+	}
+
+	return nil, nil
+}
+
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type MarkdownView.
 func (v *MarkdownViewCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
 	markdownview, ok := obj.(*viewv1.MarkdownView)
@@ -105,7 +117,7 @@ func (v *MarkdownViewCustomValidator) ValidateCreate(ctx context.Context, obj ru
 	}
 	markdownviewlog.Info("Validation for MarkdownView upon creation", "name", markdownview.GetName())
 
-	return v.validate(obj)
+	return v.validate(markdownview)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type MarkdownView.
@@ -116,37 +128,7 @@ func (v *MarkdownViewCustomValidator) ValidateUpdate(ctx context.Context, oldObj
 	}
 	markdownviewlog.Info("Validation for MarkdownView upon update", "name", markdownview.GetName())
 
-	return v.validate(newObj)
-}
-
-func (v *MarkdownViewCustomValidator) validate(obj runtime.Object) (admission.Warnings, error) {
-	markdownview, ok := obj.(*viewv1.MarkdownView)
-	if !ok {
-		return nil, fmt.Errorf("expected a MarkdownView object but got %T", obj)
-	}
-
-	var errs field.ErrorList
-
-	if markdownview.Spec.Replicas < 1 || markdownview.Spec.Replicas > 5 {
-		errs = append(errs, field.Invalid(field.NewPath("spec", "replicas"), markdownview.Spec.Replicas, "replicas must be in the range of 1 to 5."))
-	}
-
-	hasSummary := false
-	for name := range markdownview.Spec.Markdowns {
-		if name == "SUMMARY.md" {
-			hasSummary = true
-			break
-		}
-	}
-	if !hasSummary {
-		errs = append(errs, field.Required(field.NewPath("spec", "markdowns"), "markdowns must have SUMMARY.md."))
-	}
-
-	if len(errs) > 0 {
-		return nil, logValidationError(markdownview, errs)
-	}
-
-	return nil, nil
+	return v.validate(markdownview)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type MarkdownView.
@@ -157,7 +139,6 @@ func (v *MarkdownViewCustomValidator) ValidateDelete(ctx context.Context, obj ru
 	}
 	markdownviewlog.Info("Validation for MarkdownView upon deletion", "name", markdownview.GetName())
 
-	// TODO(user): fill in your validation logic upon object deletion.
-
+	// No specific validation needed for deletion, but logging is added for traceability.
 	return nil, nil
 }
